@@ -68,11 +68,14 @@ static void activate_mapping(struct irq_info *info, void *data __attribute__((un
 	/*
  	 * Don't activate anything for which we have an invalid mask 
  	 */
-	if (check_affinity(info, applied_mask))
+	if (check_affinity(info, applied_mask)) {
+		info->moved = 0; /* nothing to do, mark as done */
 		return;
+	}
 
 	sprintf(buf, "/proc/irq/%i/smp_affinity", info->irq);
 	file = fopen(buf, "w");
+	errsave = errno;
 	if (!file)
 		goto error;
 
