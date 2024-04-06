@@ -21,7 +21,7 @@ char *IRQ_CLASS_TO_STR[] = {
 			"10-Gigabit Ethernet",
 			"Virt Event"};
 
-void show_frame()
+void show_frame(void)
 {
 	int i;
 	attrset(COLOR_PAIR(4));
@@ -37,7 +37,7 @@ void show_frame()
 	}
 }
 
-void show_footer()
+void show_footer(void)
 {
 	char footer[COLS];
 	snprintf(footer, COLS - 1,
@@ -101,7 +101,7 @@ int get_valid_sleep_input(int column_offest)
 		if(input == NULL) {
 			curs_set(0);
 			attrset(COLOR_PAIR(1));
-			mvprintw(2, column_offest, "%lu			", new_sleep);
+			mvprintw(2, column_offest, "%" PRIu64 "			", new_sleep);
 			move(LINES, COLS);
 			break;
 		}
@@ -113,24 +113,23 @@ int get_valid_sleep_input(int column_offest)
 		new_sleep = strtol(input, &error, 10);
 		if((*error == '\0') && (new_sleep >= 1)) {
 			break;
-		} else {
-			new_sleep = setup.sleep;
-			attrset(COLOR_PAIR(4) | A_BOLD);
-			mvprintw(LINES - 2, 1,
-				"Invalid input: %s								",
-				input);
-			refresh();
 		}
+		new_sleep = setup.sleep;
+		attrset(COLOR_PAIR(4) | A_BOLD);
+		mvprintw(LINES - 2, 1,
+			"Invalid input: %s								",
+			input);
+		refresh();
 		free(input);
 	}
 
 	attrset(COLOR_PAIR(1));
-	mvprintw(2, column_offest, "%lu				", new_sleep);
+	mvprintw(2, column_offest, "%" PRIu64 "				", new_sleep);
 
 	return new_sleep;
 }
 
-void get_banned_cpu(int *cpu, void *data __attribute__((unused)))
+void get_banned_cpu(int *cpu, char *data __attribute__((unused)))
 {
 	cpu_ban_t *new = malloc(sizeof(cpu_ban_t));
 	new->number = *cpu;
@@ -172,7 +171,7 @@ void print_cpu_line(cpu_ban_t *cpu, void *data __attribute__((unused)))
 	max_offset++;
 }
 
-void print_all_cpus()
+void print_all_cpus(void)
 {
 	max_offset = 0;
 	if(all_cpus == NULL) {
@@ -188,12 +187,12 @@ void print_all_cpus()
 		max_offset = 0;
 }
 
-void add_banned_cpu(int *banned_cpu, void *data)
+void add_banned_cpu(int *banned_cpu, char *data)
 {
 	snprintf(data + strlen(data), 1024 - strlen(data), "%d, ", *banned_cpu);
 }
 
-void display_banned_cpus()
+void display_banned_cpus(void)
 {
 	char banned_cpus[1024] = "Banned CPU numbers: \0";
 	if(g_list_length(setup.banned_cpus) > 0) {
@@ -247,7 +246,7 @@ void get_cpu(cpu_node_t *node, void *data __attribute__((unused)))
 	}
 }
 
-void handle_cpu_banning()
+void handle_cpu_banning(void)
 {
 	GList *tmp = g_list_copy_deep(all_cpus, copy_cpu_ban, NULL);
 	attrset(COLOR_PAIR(5));
@@ -296,7 +295,7 @@ void handle_cpu_banning()
 		case '\r': {
 			attrset(COLOR_PAIR(3));
 			int banned = toggle_cpu(tmp, position + offset - 6);
-			mvprintw(position, 3, "CPU %d     ", position + offset - 6);
+			mvprintw(position, 3, "CPU %zu     ", position + offset - 6);
 			if(banned) {
 				mvprintw(position, 19, "YES");
 			} else {
@@ -369,7 +368,7 @@ static inline void bsnl_emit(char *buf, int buflen)
 		snprintf(buf + len, buflen - len, "%d-%d", rbot, rtop);
 }
 
-void copy_assigned_obj(int *number, void *data)
+void copy_assigned_obj(int *number, char *data)
 {
 	if (rtop == -1) {
 		rbot = rtop = *number;
@@ -504,7 +503,7 @@ void print_irq_line(irq_t *irq, void *data __attribute__((unused)))
 	mvprintw(line, 120, "%s", irq_name[line]);
 }
 
-void print_all_irqs()
+void print_all_irqs(void)
 {
 	max_offset = 0;
 	attrset(COLOR_PAIR(0));
@@ -555,13 +554,13 @@ void copy_irqs_from_nodes(cpu_node_t *node, void *data __attribute__((unused)))
 	}
 }
 
-void get_all_irqs()
+void get_all_irqs(void)
 {
 	all_irqs = g_list_copy_deep(setup.banned_irqs, copy_irq, NULL);
 	for_each_node(tree, copy_irqs_from_nodes, NULL);
 }
 
-void handle_irq_banning()
+void handle_irq_banning(void)
 {
 	GList *tmp = g_list_copy_deep(all_irqs, copy_irq, NULL);
 	attrset(COLOR_PAIR(5));
@@ -670,7 +669,7 @@ void handle_irq_banning()
 	}
 }
 
-void handle_sleep_setting()
+void handle_sleep_setting(void)
 {
 	char info[128] = "Current sleep interval between rebalancing: \0";
 	uint8_t sleep_input_offset = strlen(info) + 3;
@@ -693,7 +692,7 @@ void handle_sleep_setting()
 	refresh();
 }
 
-void init()
+void init(void)
 {
 	signal(SIGINT, close_window);
 	initscr();
@@ -732,7 +731,7 @@ void close_window(int sig __attribute__((unused)))
 	exit(EXIT_SUCCESS);
 }
 
-void settings()
+void settings(void)
 {
 	clear();
 	char *setup_data = get_data(SETUP);
@@ -751,7 +750,7 @@ void settings()
 	free(setup_data);
 }
 
-void setup_irqs()
+void setup_irqs(void)
 {
 	clear();
 	get_all_irqs();
@@ -770,7 +769,7 @@ void display_tree_node_irqs(irq_t *irq, void *data)
 	if (max_offset >= offset && max_offset - offset < LINES - 5) {
 		snprintf(indent + strlen(indent), 32 - strlen(indent), "%s", (char *)data);
 		attrset(COLOR_PAIR(3));
-		printw("%sIRQ %u, IRQs since last rebalance %lu\n",
+		printw("%sIRQ %u, IRQs since last rebalance %" PRIu64 "\n",
 			indent, irq->vector, irq->diff);
 	}
 	max_offset++;
@@ -830,7 +829,7 @@ void display_tree_node(cpu_node_t *node, void *data)
 	}
 }
 
-void display_tree()
+void display_tree(void)
 {
 	clear();
 	char *setup_data = get_data(SETUP);
