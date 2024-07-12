@@ -51,7 +51,7 @@ void show_footer(void)
 
 char * check_control_in_sleep_input(int max_len, int column_offest, int line_offset)
 {
-	char *input_to = malloc(max_len * sizeof(char));
+	char *input_to = g_malloc_n(max_len, sizeof(char));
 	int iteration = 0;
 	while(iteration < max_len) {
 		int new = getch();
@@ -76,7 +76,7 @@ char * check_control_in_sleep_input(int max_len, int column_offest, int line_off
 			attrset(COLOR_PAIR(5) | A_REVERSE | A_BOLD);
 			break;
 		case 27:
-			free(input_to);
+			g_free(input_to);
 			return NULL;
 		default:
 			input_to[iteration] = new;
@@ -112,6 +112,7 @@ int get_valid_sleep_input(int column_offest)
 		char *error;
 		new_sleep = strtol(input, &error, 10);
 		if((*error == '\0') && (new_sleep >= 1)) {
+			g_free(input);
 			break;
 		}
 		new_sleep = setup.sleep;
@@ -120,7 +121,7 @@ int get_valid_sleep_input(int column_offest)
 			"Invalid input: %s								",
 			input);
 		refresh();
-		free(input);
+		g_free(input);
 	}
 
 	attrset(COLOR_PAIR(1));
@@ -131,7 +132,7 @@ int get_valid_sleep_input(int column_offest)
 
 void get_banned_cpu(int *cpu, char *data __attribute__((unused)))
 {
-	cpu_ban_t *new = malloc(sizeof(cpu_ban_t));
+	cpu_ban_t *new = g_malloc(sizeof(cpu_ban_t));
 	new->number = *cpu;
 	new->is_banned = 1;
 	all_cpus = g_list_append(all_cpus, new);
@@ -236,7 +237,7 @@ void get_new_cpu_ban_values(cpu_ban_t *cpu, void *data)
 void get_cpu(cpu_node_t *node, void *data __attribute__((unused)))
 {
 	if(node->type == OBJ_TYPE_CPU) {
-		cpu_ban_t *new = malloc(sizeof(cpu_ban_t));
+		cpu_ban_t *new = g_malloc(sizeof(cpu_ban_t));
 		new->number = node->number;
 		new->is_banned = 0;
 		all_cpus = g_list_append(all_cpus, new);
@@ -335,9 +336,9 @@ void handle_cpu_banning(void)
 			show_frame();
 			show_footer();
 			refresh();
-			char settings_string[1024] = "settings cpus \0";
+			char settings_string[1024] = "settings cpus ";
 			for_each_cpu(all_cpus, get_new_cpu_ban_values, settings_string);
-			if(!strcmp("settings cpus \0", settings_string)) {
+			if(g_str_has_prefix(settings_string, "settings cpus ")) {
 				strncpy(settings_string + strlen(settings_string),
 						"NULL", 1024 - strlen(settings_string));
 			}
@@ -395,16 +396,15 @@ void print_assigned_objects_string(irq_t *irq, int *line_offset)
 
 void get_irq_name(int end)
 {
-	int i, cpunr, len;
+	int i, cpunr;
 	FILE *output;
 	char *cmd;
 	char buffer[128];
 
 	if (irq_name == NULL) {
-		irq_name = malloc(sizeof(char *) * LINES);
+		irq_name = g_malloc_n(LINES, sizeof(char *));
 		for (i = 4; i < LINES; i++) {
-			irq_name[i] = malloc(sizeof(char) * 50);
-			memset(irq_name[i], 0, sizeof(char) * 50);
+			irq_name[i] = g_malloc0_n(50, sizeof(char));
 		}
 	}
 
@@ -414,10 +414,11 @@ void get_irq_name(int end)
 	fscanf(output, "%d", &cpunr);
 	pclose(output);
 
-	len = snprintf(NULL, 0, "cat /proc/interrupts | awk '{for (i=%d;i<=NF;i++)printf(\"%%s \", $i);print \"\"}' | cut -c-49", cpunr + 2);
-	cmd = alloca(sizeof(char) * (len + 1));
-	snprintf(cmd, len + 1, "cat /proc/interrupts | awk '{for (i=%d;i<=NF;i++)printf(\"%%s \", $i);print \"\"}' | cut -c-49", cpunr + 2);
+	cmd = g_strdup_printf("cat /proc/interrupts | awk '{for (i=%d;i<=NF;i++)printf(\"%%s \", $i);print \"\"}' | cut -c-49", cpunr + 2);
 	output = popen(cmd, "r");
+	g_free(cmd);
+	if (!output)
+		return;
 	for (i = 0; i <= offset; i++)
 		fgets(buffer, 50, output);
 	for (i = 4; i < end; i++)
@@ -653,7 +654,7 @@ void handle_irq_banning(void)
 			refresh();
 			char settings_string[1024] = BAN_IRQS;
 			for_each_irq(all_irqs, get_new_irq_ban_values, settings_string);
-			if(!strcmp(BAN_IRQS, settings_string)) {
+			if(g_str_has_prefix(settings_string, BAN_IRQS)) {
 				strncpy(settings_string + strlen(settings_string),
 						" NONE", 1024 - strlen(settings_string));
 			}
@@ -681,9 +682,9 @@ void handle_sleep_setting(void)
 	uint64_t new_sleep = get_valid_sleep_input(sleep_input_offset);
 	if(new_sleep != setup.sleep) {
 		setup.sleep = new_sleep;
-		char settings_data[128];
-		snprintf(settings_data, 128, "%s %" PRIu64, SET_SLEEP, new_sleep);
+		char *settings_data = g_strdup_printf("%s %" PRIu64, SET_SLEEP, new_sleep);
 		send_settings(settings_data);
+		g_free(settings_data);
 	}
 	attrset(COLOR_PAIR(5));
 	mvprintw(LINES - 2, 1, "Press <S> for changing sleep setup, <C> for CPU ban setup. ");
@@ -737,10 +738,10 @@ void settings(void)
 	char *setup_data = get_data(SETUP);
 	parse_setup(setup_data);
 
-	char info[128] = "Current sleep interval between rebalancing: \0";
-	snprintf(info + strlen(info), 128 - strlen(info), "%" PRIu64 "\n", setup.sleep);
+	char *info = g_strdup_printf("Current sleep interval between rebalancing: %" PRIu64 "\n", setup.sleep);
 	attrset(COLOR_PAIR(1));
 	mvprintw(2, 3, "%s", info);
+	g_free(info);
 	print_all_cpus();
 	attrset(COLOR_PAIR(5));
 	mvprintw(LINES - 2, 1, "Press <S> for changing sleep setup, <C> for CPU ban setup. ");
