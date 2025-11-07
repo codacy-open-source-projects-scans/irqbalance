@@ -55,7 +55,7 @@ struct irq_match {
 static int check_platform_device(char *name, struct irq_info *info)
 {
 	DIR *dirfd;
-	char path[512];
+	char path[PATH_MAX];
 	struct dirent *ent;
 	int rc = -ENOENT, i;
 	static struct pdev_irq_info {
@@ -69,11 +69,11 @@ static int check_platform_device(char *name, struct irq_info *info)
 		{NULL},
 	};
 
-	memset(path, 0, 512);
+	if (snprintf(path, PATH_MAX, "/sys/devices/platform/%s/", name) >= PATH_MAX) {
+		log(TO_ALL, LOG_WARNING, "WARNING: Platform device path in /sys exceeds PATH_MAX, cannot examine");
+		return -ENAMETOOLONG;
+	}
 
-	strcat(path, "/sys/devices/platform/");
-	strcat(path, name);
-	strcat(path, "/");
 	dirfd = opendir(path);
 
 	if (!dirfd) {
@@ -171,9 +171,9 @@ void init_irq_class_and_type(char *savedline, struct irq_info *info, int irq)
 		 * /proc/interrupts format defined, after of interrupt type
 		 * the reset string is mark the irq desc name.
 		 */
-		if (!g_str_has_prefix(irq_name, "Level") ||
-                                !g_str_has_prefix(irq_name, "Edge"))
-                        break;
+		if (g_str_has_prefix(irq_name, "Level") ||
+				g_str_has_prefix(irq_name, "Edge"))
+			break;
 #endif
 	}
 
